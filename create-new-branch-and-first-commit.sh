@@ -32,10 +32,10 @@ if ! git status | grep -q 'Your branch is up to date'; then
   exit
 fi
 
-resVar=$(mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep -v '\[') &> /dev/null
-if [[ ${resVar} != *"-SNAPSHOT"* ]]; then
+currentVersion=$(mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep -v '\[') &> /dev/null
+if [[ ${currentVersion} != *"-SNAPSHOT"* ]]; then
   git checkout -b "$branchName"
-  mvn versions:set -DnewVersion="$resVar"."$branchName"'-SNAPSHOT'
+  mvn versions:set -DnewVersion="$currentVersion"."$branchName"'-SNAPSHOT'
   mvn versions:commit
   git add pom.xml
   git commit -m "$branchName"" Версия задачи"$'\n'$'\n'"$taskName".
