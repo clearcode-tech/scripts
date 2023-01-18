@@ -169,18 +169,18 @@ function display_usage() {
   echo -e "\nИспользование: $0 [имя_создаваемой_ветки] [название_задачи_без_точки_в_кавычках] \n"
 }
 
+# Check whether user had supplied -h or --help. If yes display usage
+if [[ ($* == "--help") ||  ($* == "-h") ]]
+then
+  display_usage
+  exit 0
+fi
+
 # If less than two arguments supplied, display usage
 if [  $# -le 1 ]
 then
   display_usage
   exit 1
-fi
-
-# Check whether user had supplied -h or --help. If yes display usage
-if [[ ( $@ == "--help") ||  $@ == "-h" ]]
-then
-  display_usage
-  exit 0
 fi
 
 branchName=$1
