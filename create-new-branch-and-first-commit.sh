@@ -1,11 +1,16 @@
 #!/bin/bash
-# Скрипт создания задачной ветки и начального коммита для maven-проектов
+
+# Имя скрипта: create-new-branch-and-first-commit.sh
+# Назначение скрипта: Скрипт создания задачной ветки и начального коммита для проектов maven, sbt, angular.
+# Автор: Пашинский Михаил
+# Дата: 10-01-2023
 #
 # Скрипт выполняет следующие действия:
 #  - обновляет ветку
 #  - проверяет, что репозиторий находится не на задачной ветке по значению версии maven-проекта
 #  - создаёт новую ветку
-#  - устанавливает версию maven-проекта
+#  - определяет тип проекта
+#  - устанавливает версию проекта в соответствии с типом проекта
 #  - делает первый коммит к задаче
 #
 # Валидации:
@@ -17,45 +22,210 @@
 #  - branchName - Имя ветки, которая будет создана
 #  - taskName - Название задачи, которое будет добавлено в первый комментарий
 
+# Constants for project types
+readonly MAVEN_PROJECT="Maven"
+readonly SBT_PROJECT="SBT"
+readonly ANGULAR_PROJECT="Angular"
+readonly UNRECOGNIZED_PROJECT="Unrecognized"
+
+# Arguments check
+function validate_args() {
+
+    # Check that branch name parameter is set
+    if [ -z "$branchName" ]; then
+      echo "Error: No branch name specified."
+      exit 1
+    fi
+
+    # Check that task name parameter is set
+    if [ -z "$taskName" ]; then
+      echo "Error: No task name specified."
+      exit 1
+    fi
+}
+
+# Check branch for uncommitted changes or local commits
+function check_branch_for_uncommitted_or_local_commits() {
+
+    if git status | grep -q 'Changes to be committed'; then
+      echo "Error: You have uncommitted changes. New branch cannot be created."
+      exit 1
+    fi
+
+    if git status | grep -q 'Your branch is ahead of'; then
+      echo "Error: You have local commits. New branch cannot be created."
+      exit 1
+    fi
+}
+
+# Check branch is up to date
+function check_branch_is_up_to_date() {
+
+    if ! git status | grep -q 'Your branch is up to date'; then
+      echo "Error: Your local branch state is not up to date with origin. New branch cannot be created."
+      exit 1
+    fi
+}
+
+# Identify the project type
+function identify_project_type() {
+
+    if [ -f "pom.xml" ]; then
+        echo MAVEN_PROJECT
+    elif [ -f "build.sbt" ]; then
+        echo SBT_PROJECT
+    elif [ -f "src/environments/version.ts" ]; then
+        echo ANGULAR_PROJECT
+    else
+        echo UNRECOGNIZED_PROJECT
+    fi
+}
+
+# Create new branch
+function create_new_branch() {
+
+    git checkout -b "$branchName"
+
+    echo "Creating new branch "$branchName
+}
+
+# Check current branch is not feature branch by project version
+function check_for_feature_branch() {
+
+    if [[ $1 == *"-SNAPSHOT"* || $1 == *"HRL-"* || $1 == *"STRL-"* ]]; then
+      echo "Error: You are on feature branch. Checkout development branch first."
+      exit 1
+    fi
+}
+
+# Set the project version for Maven project, create new branch and add changes to commit.
+function set_maven_project_version() {
+
+    # Get current version
+    currentVersion=$(mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep -v '\[') &> /dev/null
+    check_for_feature_branch "$currentVersion"
+
+    create_new_branch
+
+    # Set new version
+    mvn versions:set -DnewVersion="$currentVersion"."$branchName"'-SNAPSHOT'
+    mvn versions:commit
+
+    # Add changes to commit
+    git add pom.xml
+
+    echo "Setting version for Maven project"
+}
+
+# Set the project version for SBT project, create new branch and add changes to commit.
+function set_sbt_project_version() {
+
+    # Get version from sbt
+    currentVersion=$(grep "version :=" build.sbt | cut -d '"' -f2)
+    check_for_feature_branch "$currentVersion"
+
+    create_new_branch
+
+    # Set sbt project version
+    sed -i "s/version := .*/version := \"$currentVersion.$branchName\"/" build.sbt
+
+    # Add changes to commit
+    git add build.sbt
+
+    echo "Setting version for SBT project"
+}
+
+# Set the project version for Angular project, create new branch and add changes to commit.
+function set_angular_project_version() {
+
+    # Get version from ui project
+    currentVersion=$(grep "version: string =" src/environments/version.ts | cut -d '"' -f2)
+    check_for_feature_branch "$currentVersion"
+
+    create_new_branch
+
+    # Set version to ui project
+    sed -i "s/version: string = .*/version: string = \"$currentVersion.$branchName\";/" src/environments/version.ts
+
+    # Add changes to commit
+    git add src/environments/version.ts
+
+    echo "Setting version for Angular project"
+}
+
+# Make first commit
+function make_first_commit() {
+
+    git commit -m "$branchName"" Версия задачи"$'\n'$'\n'"$taskName".
+
+    echo "Making first commit"
+}
+
+function display_usage() {
+
+  echo "Скрипт создания задачной ветки и начального коммита для проектов: maven, sbt, angular."
+  echo "Скрипт должен быть запущен из директории проекта, для которого создаётся ветка,"
+  echo "и проект должен быть не на задачной ветке, а на ветке dev или master."
+  echo -e "\nИспользование: $0 [имя_создаваемой_ветки] [название_задачи_без_точки_в_кавычках] \n"
+}
+
+# If less than two arguments supplied, display usage
+if [  $# -le 1 ]
+then
+  display_usage
+  exit 1
+fi
+
+# Check whether user had supplied -h or --help. If yes display usage
+if [[ ( $@ == "--help") ||  $@ == "-h" ]]
+then
+  display_usage
+  exit 0
+fi
+
 branchName=$1
 taskName=$2
 
-if [ -z "$branchName" ]; then
-  echo "No branch name specified."
-  exit
-fi
+validate_args
 
-if [ -z "$taskName" ]; then
-  echo "No task name specified."
-  exit
-fi
+echo "Branch name: $branchName"
+echo "Task name: $taskName"
 
+# Fetch all branches
 git fetch --all
 
-if git status | grep -q 'Changes to be committed'; then
-  echo "You have uncommitted changes. New branch cannot be created."
-  exit
-fi
+check_branch_for_uncommitted_or_local_commits
 
-if git status | grep -q 'Your branch is ahead of'; then
-  echo "You have local commits. New branch cannot be created."
-  exit
-fi
-
+# Pull changes
 git pull
 
-if ! git status | grep -q 'Your branch is up to date'; then
-  echo "Your local branch state is not up to date with origin. New branch cannot be created."
-  exit
-fi
+check_branch_is_up_to_date
 
-currentVersion=$(mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep -v '\[') &> /dev/null
-if [[ ${currentVersion} != *"-SNAPSHOT"* ]]; then
-  git checkout -b "$branchName"
-  mvn versions:set -DnewVersion="$currentVersion"."$branchName"'-SNAPSHOT'
-  mvn versions:commit
-  git add pom.xml
-  git commit -m "$branchName"" Версия задачи"$'\n'$'\n'"$taskName".
-else
-  echo "You are on feature branch. Checkout development branch first."
-fi
+# call the project identification function and store result in variable
+projectType=$(identify_project_type)
+
+echo "Project Type: ${!projectType}"
+
+case $projectType in
+
+  MAVEN_PROJECT)
+    set_maven_project_version
+    ;;
+
+  SBT_PROJECT)
+    set_sbt_project_version
+    ;;
+
+  ANGULAR_PROJECT)
+    set_angular_project_version
+    ;;
+
+  *)
+    echo "Error: Unsupported project type"
+    exit 1
+    ;;
+esac
+
+make_first_commit
+
+exit 0
