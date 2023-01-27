@@ -30,6 +30,10 @@ readonly SBT_PROJECT="SBT"
 readonly ANGULAR_PROJECT="Angular"
 readonly UNRECOGNIZED_PROJECT="Unrecognized"
 
+# Script options
+NO_FETCH=false
+NO_COMPILE=false
+
 # Check branch for uncommitted changes or local commits
 function check_branch_for_uncommitted_or_local_commits() {
 
@@ -49,7 +53,10 @@ function display_usage() {
 
   echo "Скрипт переключения на ветку и компиляции проекта для проектов: maven, sbt, angular."
   echo "Скрипт может быть запущен из любой директории, если заданы абсолютные пути."
-  echo -e "\nИспользование: $0 [имя_ветки] \n"
+  echo -e "\nИспользование: $0 [имя_ветки] [опции] \n"
+  echo -e "Опции:"
+  echo -e "   -nf | --no-fetch    Не делать git fetch перед переключением на ветку"
+  echo -e "   -nc | --no-compile  Не компилировать проект после переключения на ветку"
 }
 
 # Identify the project type
@@ -66,27 +73,82 @@ function identify_project_type() {
     fi
 }
 
-# Check whether user had supplied -h or --help. If yes display usage
-if [[ ($* == "--help") ||  ($* == "-h") ]]
-then
-  display_usage
-  exit 0
-fi
+function compileProject() {
 
-# If less than two arguments supplied, display usage
+  # call the project identification function and store result in variable
+  projectType=$(identify_project_type)
+
+  echo "Project Type: ${!projectType}"
+
+  case $projectType in
+
+    MAVEN_PROJECT)
+      mvn install
+      ;;
+
+    SBT_PROJECT)
+      sbt reload clean compile
+      ;;
+
+    ANGULAR_PROJECT)
+      ;;
+
+    *)
+      echo "Error: Unsupported project type"
+      exit 1
+      ;;
+  esac
+}
+
+# Parse arguments
+function parseArguments() {
+
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      -nf|--no-fetch)
+        NO_FETCH=true
+        shift
+        ;;
+      -nc|--no-compile)
+        NO_COMPILE=true
+        shift
+        ;;
+      -h|--help)
+        display_usage
+        exit 0
+        ;;
+      *)
+        POSITIONAL_ARGS+=("$1") # save positional arg
+        shift # past argument
+        ;;
+    esac
+  done
+}
+
+parseArguments "$@"
+set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+
+# If less than one argument supplied, display usage
 if [  $# -le 0 ]
 then
   display_usage
   exit 1
 fi
 
+echo "Fetching disabled: $NO_FETCH";
+echo "Compile disabled: $NO_COMPILE";
 echo "Branch to checkout: $1";
 branchName=$1
 
 for dir in "${dirs[@]}"
 do
   cd "$dir" || exit 1
-  git fetch --all
+
+  if ! $NO_FETCH ; then
+
+    git fetch --all
+  fi
+
   git show-branch remotes/origin/"$branchName" &> /dev/null
   if [ $? -eq 0 ]; then
 
@@ -99,28 +161,10 @@ do
 
     git pull
 
-    # call the project identification function and store result in variable
-    projectType=$(identify_project_type)
+    if ! $NO_COMPILE ; then
 
-    echo "Project Type: ${!projectType}"
+      compileProject
+    fi
 
-    case $projectType in
-
-      MAVEN_PROJECT)
-        mvn install
-        ;;
-
-      SBT_PROJECT)
-        sbt reload clean compile
-        ;;
-
-      ANGULAR_PROJECT)
-        ;;
-
-      *)
-        echo "Error: Unsupported project type"
-        exit 1
-        ;;
-    esac
   fi
 done
