@@ -6,9 +6,9 @@
 # Дата: 10-01-2023
 #
 # Скрипт проходит циклом по заданному списку директорий и выполняет следующие действия:
-#  - если заданной ветки не существует, то переходи в следующую директорию
-#  - переключается на заданную ветку
-#  - пуллит заданную ветку
+#  - если заданной ветки не существует, то переходит в следующую директорию
+#  - если нет локальных коммитов и незакоммиченных изменений - переключается на заданную ветку
+#  - если нет локальных коммитов и незакоммиченных изменений - пуллит заданную ветку
 #  - собирает проект, если тип проекта maven, sbt.
 # Важно! Порядок директорий должен задаваться от менее зависимых к более зависимым.
 #
@@ -29,6 +29,20 @@ readonly MAVEN_PROJECT="Maven"
 readonly SBT_PROJECT="SBT"
 readonly ANGULAR_PROJECT="Angular"
 readonly UNRECOGNIZED_PROJECT="Unrecognized"
+
+# Check branch for uncommitted changes or local commits
+function check_branch_for_uncommitted_or_local_commits() {
+
+    if git status | grep -q 'Changes to be committed'; then
+      echo "Error: You have uncommitted changes"
+      exit 1
+    fi
+
+    if git status | grep -q 'Your branch is ahead of'; then
+      echo "Error: You have local commits"
+      exit 1
+    fi
+}
 
 # Display usage
 function display_usage() {
@@ -76,8 +90,13 @@ do
   git show-branch remotes/origin/"$branchName" &> /dev/null
   if [ $? -eq 0 ]; then
 
-    echo "Checking out for" "$dir"
+    check_branch_for_uncommitted_or_local_commits
+
+    echo "Checking out branch" "$dir"
     git checkout "$branchName"
+
+    check_branch_for_uncommitted_or_local_commits
+
     git pull
 
     # call the project identification function and store result in variable
