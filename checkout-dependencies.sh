@@ -31,38 +31,38 @@ packages["spring-backend"]="tech.clearcode.core.spring-backend.version"
 # Функция для выполнения git checkout и компиляции для указанного пакета
 function process_package {
 
-    local PACKAGE=$1
-    local GIT_REPO_PATH=${package_disk_paths[$PACKAGE]}
+  local PACKAGE=$1
+  local GIT_REPO_PATH=${package_disk_paths[$PACKAGE]}
 
-    # Получить версию из pom.xml для указанного пакета
-    local VERSION=$(mvn help:evaluate -Dexpression=${packages[$PACKAGE]} -q -DforceStdout | grep -v '\[')
-    if [ -z "$GIT_REPO_PATH" ] || [ -z "$VERSION" ] || [ "$VERSION" == "null object or invalid expression" ]; then
+  # Получить версию из pom.xml для указанного пакета
+  local VERSION=$(mvn help:evaluate -Dexpression=${packages[$PACKAGE]} -q -DforceStdout | grep -v '\[')
+  if [ -z "$GIT_REPO_PATH" ] || [ -z "$VERSION" ] || [ "$VERSION" == "null object or invalid expression" ]; then
 
-        echo "Пакет '$PACKAGE' не найден в справочнике или не удалось получить версию из pom.xml."
-        return
-    fi
+      echo "Пакет '$PACKAGE' не найден в справочнике или не удалось получить версию из pom.xml."
+      return
+  fi
 
-    # Перейти в директорию локального репозитория Git
-    cd $GIT_REPO_PATH
+  # Перейти в директорию локального репозитория Git
+  cd $GIT_REPO_PATH
 
-    # Выполнить checkout по указанной версии и пути
-    git checkout $VERSION
+  # Выполнить checkout по указанной версии и пути
+  git checkout $VERSION
 
-    # Проверить, прошел ли checkout успешно
-    if [ $? -eq 0 ]; then
-        # Если checkout прошел успешно, скомпилировать Maven проект
-        mvn clean
-        mvn install
-        if [ $? -eq 0 ]; then
-            echo "Проект '$PACKAGE' скомпилирован успешно."
-        else
-            echo "Ошибка: Не удалось скомпилировать проект '$PACKAGE'."
-        fi
-    else
-        echo "Ошибка: Не удалось выполнить checkout для пакета '$PACKAGE'."
-    fi
+  # Проверить, прошел ли checkout успешно
+  if [ $? -eq 0 ]; then
+      # Если checkout прошел успешно, скомпилировать Maven проект
+      mvn clean
+      mvn install
+      if [ $? -eq 0 ]; then
+          echo "Проект '$PACKAGE' скомпилирован успешно."
+      else
+          echo "Ошибка: Не удалось скомпилировать проект '$PACKAGE'."
+      fi
+  else
+      echo "Ошибка: Не удалось выполнить checkout для пакета '$PACKAGE'."
+  fi
 
-    process_all_packages
+  process_all_packages
 }
 
 # Функция для выполнения сборки всех зависимостей
@@ -75,8 +75,21 @@ function process_all_packages {
   done
 }
 
-for project_path in "${project_paths[@]}"
-do
+for project_path in "${project_paths[@]}"; do
+
+  echo ""
+  echo "=================== Получение и сборка зависимостей проекта: ""$project_path""==================="
+  echo ""
+
   cd "$project_path" || exit 1
   process_all_packages
+
+  echo ""
+  echo "=================== Сборка проекта: ""$project_path""==================="
+  echo ""
+
+  cd "$project_path" || exit 1
+  mvn clean
+  mvn install
+
 done
