@@ -105,7 +105,7 @@ function check_for_feature_branch() {
 function set_maven_project_version() {
 
     # Get current version
-    currentVersion=$(mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep -v '\[') &> /dev/null
+    currentVersion=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | grep -v '\[')
     check_for_feature_branch "$currentVersion"
 
     create_new_branch
