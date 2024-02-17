@@ -12,6 +12,7 @@
 #  - определяет тип проекта
 #  - устанавливает версию проекта в соответствии с типом проекта
 #  - делает первый коммит к задаче
+#  - создаёт пулл-реквесты в ветку dev, и если задан ключ -hf | --hotfix, то и в мастер
 #
 # Валидации:
 #  - Проверяет, что параметры заданы
@@ -21,6 +22,8 @@
 # Параметры:
 #  - branchName - Имя ветки, которая будет создана
 #  - taskName - Название задачи, которое будет добавлено в первый комментарий
+#  - key:  - Ключ запуска скрипта:
+#               -hf | --hotfix если задача выпускается как хотфикс и нужен дополнительный пулл-реквест в мастер-ветку
 
 # Constants for project types
 readonly MAVEN_PROJECT="Maven"
@@ -161,6 +164,33 @@ function make_first_commit() {
     echo "Making first commit"
 }
 
+# Create pull requests
+function create_pull_requests() {
+
+    create_pull_request_to_dev
+    if [[ $key == "-hf" || $key == "--hotfix" ]]; then
+
+      #сделать пустой коммит для создания пулл-реквеста в мастер
+      git commit --allow-empty -m "$branchName"" ""$taskName"$'\n'$'\n'"Пустой коммит для создания пулл-реквеста в мастер-ветку".
+
+      create_pull_request_to_master
+    fi
+}
+
+# Create pull request to dev
+function create_pull_request_to_dev() {
+
+    echo "Создание пулл-реквеста в ветку dev"
+    git push -o mr.create -o mr.target=dev -o mr.title="$branchName"" ""$taskName" -o mr.description="$taskName""." origin "$branchName"
+}
+
+# Create pull request to master
+function create_pull_request_to_master() {
+
+    echo "Создание пулл-реквеста в ветку master"
+    git push -o mr.create -o mr.target=master -o mr.title="$branchName"" ""$taskName" -o mr.description="$taskName""." origin "$branchName"
+}
+
 function display_usage() {
 
   echo "Скрипт создания задачной ветки и начального коммита для проектов: maven, sbt, angular."
@@ -185,6 +215,7 @@ fi
 
 branchName=$1
 taskName=$2
+key=$3
 
 validate_args
 
@@ -227,5 +258,9 @@ case $projectType in
 esac
 
 make_first_commit
+
+#Запросить нажатие клавиши для создания пулл-реквестов
+read -p "Для создания пулл-реквестоа нажми любую клавишу. Для завершения работы нажми Ctrl+C"
+create_pull_requests
 
 exit 0
