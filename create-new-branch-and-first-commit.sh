@@ -159,9 +159,9 @@ function set_angular_project_version() {
 # Make first commit
 function make_first_commit() {
 
-    git commit -m "$branchName"" Версия задачи"$'\n'$'\n'"$taskName".
+    read -p "Создание первого коммита. Ветка: $branchName, имя задачи: $taskName. Для создания коммита нажми любую клавишу. Для завершения работы нажми Ctrl+C"
 
-    echo "Making first commit"
+    git commit -m "$branchName"" Версия задачи"$'\n'$'\n'"$taskName".
 }
 
 # Create pull requests
