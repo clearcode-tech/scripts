@@ -176,12 +176,12 @@ function validate_args() {
 function check_branch_for_uncommitted_or_local_commits() {
 
     if git status | grep -q 'Changes to be committed'; then
-      echo "Error: You have uncommitted changes. New branch cannot be created."
+      echo "Error: You have uncommitted changes. Merge cannot be done."
       exit 1
     fi
 
     if git status | grep -q 'Your branch is ahead of'; then
-      echo "Error: You have local commits. New branch cannot be created."
+      echo "Error: You have local commits. Merge cannot be done."
       exit 1
     fi
 }
