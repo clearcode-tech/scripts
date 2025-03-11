@@ -42,15 +42,17 @@ main() {
   fi
 
   # If less than one argument supplied, display usage
-  if [  $# -ne 1 ]
+  if [  $# -ne 2 ]
   then
     display_usage
     exit 1
   fi
 
-  branchName=$1
+  releaseBranchName=$1
+  branchName=$2
 
   validate_args
+  echo "Имя релизной ветки: $releaseBranchName"
   echo "Имя ветки для слития: $branchName"
 
   # Fetch all branches
@@ -58,7 +60,7 @@ main() {
 
   check_branch_for_uncommitted_or_local_commits
 
-  git checkout dev
+
   # Pull changes
   git pull
 
@@ -103,16 +105,16 @@ function merge_branch() {
     read -n 1 -s -r -p "Есть конфликты в результате слития! Разреши конфликты и нажми любую клавишу для продолжения. Для отмены нажми Ctrl+C"
   done
 
-  git commit -m "Merge branch $branchName into dev"
+  git commit -m "Merge branch $branchName into $releaseBranchName"
 }
 
 # Display usage
 function display_usage() {
 
-  echo "Скрипт слития задачной ветки в dev ветку и создания фиксирующего версию коммита для проектов maven, sbt, angular."
+  echo "Скрипт слития задачной ветки в релизную ветку и создания фиксирующего версию коммита для проектов maven, sbt, angular."
   echo "Скрипт должен быть запущен из директории проекта, для которого производится слитие,"
-  echo "и проект должен может быть на задачной ветке, на ветке dev или master."
-  echo -e "\nИспользование: $0 [имя_сливаемой_ветки]\n"
+  echo "и проект должен быть на релизной ветке."
+  echo -e "\nИспользование: $0 [имя_релизной_ветки] $1 [имя_сливаемой_ветки]\n"
 }
 
 # Make first commit
