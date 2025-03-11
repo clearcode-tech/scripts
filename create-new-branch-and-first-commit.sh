@@ -180,8 +180,8 @@ function create_pull_requests() {
 # Create pull request to dev
 function create_pull_request_to_dev() {
 
-    echo "Создание пулл-реквеста в ветку dev"
-    git push -o mr.create -o mr.target=dev -o mr.title="$branchName"" ""$taskName" -o mr.description="$taskName""." origin "$branchName"
+    echo "Создание пулл-реквеста в ветку $pull_request_target_branch"
+    git push -o mr.create -o mr.target="$pull_request_target_branch" -o mr.title="$branchName"" ""$taskName" -o mr.description="$taskName""." origin "$branchName"
 }
 
 # Create pull request to master
@@ -196,7 +196,7 @@ function display_usage() {
   echo "Скрипт создания задачной ветки и начального коммита для проектов: maven, sbt, angular."
   echo "Скрипт должен быть запущен из директории проекта, для которого создаётся ветка,"
   echo "и проект должен быть не на задачной ветке, а на ветке dev или master."
-  echo -e "\nИспользование: $0 [имя_создаваемой_ветки] [название_задачи_без_точки_в_кавычках] \n"
+  echo -e "\nИспользование: $0 [имя_создаваемой_ветки] [название_задачи_без_точки_в_кавычках] [ветка_релиза] \n"
 }
 
 # Check whether user had supplied -h or --help. If yes display usage
@@ -207,7 +207,7 @@ then
 fi
 
 # If less than two arguments supplied, display usage
-if [  $# -le 1 ]
+if [  $# -le 2 ]
 then
   display_usage
   exit 1
@@ -215,12 +215,14 @@ fi
 
 branchName=$1
 taskName=$2
-key=$3
+pull_request_target_branch=$3
+key=$4
 
 validate_args
 
 echo "Branch name: $branchName"
 echo "Task name: $taskName"
+echo "Pull request target branch: $pull_request_target_branch"
 
 # Fetch all branches
 git fetch --all
