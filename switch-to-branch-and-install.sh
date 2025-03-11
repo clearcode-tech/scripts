@@ -33,6 +33,7 @@ readonly UNRECOGNIZED_PROJECT="Unrecognized"
 # Script options
 NO_FETCH=false
 NO_COMPILE=false
+COMPILE_ONLY=false
 
 # Check branch for uncommitted changes or local commits
 function check_branch_for_uncommitted_or_local_commits() {
@@ -83,7 +84,7 @@ function compileProject() {
   case $projectType in
 
     MAVEN_PROJECT)
-      mvn install
+      mvn install -Dspring.profiles.active=dev,dev-custom -f pom.xml
       ;;
 
     SBT_PROJECT)
@@ -113,6 +114,10 @@ function parseArguments() {
         NO_COMPILE=true
         shift
         ;;
+      -co|--compile-only)
+        COMPILE_ONLY=true
+        shift
+        ;;
       -h|--help)
         display_usage
         exit 0
@@ -129,20 +134,30 @@ parseArguments "$@"
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 # If less than one argument supplied, display usage
-if [  $# -le 0 ]
-then
-  display_usage
-  exit 1
+if ! $COMPILE_ONLY ; then
+
+  if [  $# -le 0 ]
+  then
+    display_usage
+    exit 1
+  fi
 fi
 
 echo "Fetching disabled: $NO_FETCH";
 echo "Compile disabled: $NO_COMPILE";
+echo "Compile only enabled: $COMPILE_ONLY";
 echo "Branch to checkout: $1";
 branchName=$1
 
 for dir in "${dirs[@]}"
 do
   cd "$dir" || exit 1
+
+  if $COMPILE_ONLY ; then
+
+    compileProject
+    continue
+  fi
 
   if ! $NO_FETCH ; then
 
