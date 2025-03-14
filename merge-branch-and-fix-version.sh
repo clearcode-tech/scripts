@@ -60,7 +60,10 @@ main() {
 
   check_branch_for_uncommitted_or_local_commits
 
+  git checkout "$branchName"
+  git pull
 
+  git checkout "$releaseBranchName"
   # Pull changes
   git pull
 
