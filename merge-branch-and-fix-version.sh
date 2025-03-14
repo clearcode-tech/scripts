@@ -77,15 +77,15 @@ main() {
   case $projectType in
 
     MAVEN_PROJECT)
-      newVersion=$(set_maven_project_version)
+      newVersion=$(set_maven_project_version | tail -n 1)
       ;;
 
     SBT_PROJECT)
-      newVersion=$(set_sbt_project_version)
+      newVersion=$(set_sbt_project_version | tail -n 1)
       ;;
 
     ANGULAR_PROJECT)
-      newVersion=$(set_angular_project_version)
+      newVersion=$(set_angular_project_version | tail -n 1)
       ;;
 
     *)
