@@ -108,6 +108,9 @@ function merge_branch() {
     read -n 1 -s -r -p "Есть конфликты в результате слития! Разреши конфликты и нажми любую клавишу для продолжения. Для отмены нажми Ctrl+C"
   done
 
+  read -n 1 -s -r -p "Проверь версию после слития. Для отмены нажми Ctrl+C"
+  # Нужно добавить проверку версии, если она без Strl - добавить туда ключ задачт
+
   git commit -m "Merge branch $branchName into $releaseBranchName"
 }
 
