@@ -95,10 +95,14 @@ function create_new_branch() {
 # Check current branch is not feature branch by project version
 function check_for_feature_branch() {
 
+    # If current version contains -SNAPSHOT or HRL- or STRL- then it is feature branch
     if [[ $1 == *"-SNAPSHOT"* || $1 == *"HRL-"* || $1 == *"STRL-"* ]]; then
-      echo "Error: You are on feature branch. Checkout development branch first."
-      exit 1
+
+      read -p "Ты создаёшь ветку от задачной ветки. Продолжить? Для отмены нажми Ctrl+C"
+      return 1
     fi
+    # If current version does not contain -SNAPSHOT or HRL- or STRL- then it is not feature branch
+    return 0
 }
 
 # Set the project version for Maven project, create new branch and add changes to commit.
@@ -107,6 +111,10 @@ function set_maven_project_version() {
     # Get current version
     currentVersion=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | grep -v '\[')
     check_for_feature_branch "$currentVersion"
+    # if function check_for_feature_branch returned 1, then exclude from version STRL-111-SNAPSHOT or STRL-111-SNAPSHOT or HRL-111 or STRL-2222
+    if [[ $? -eq 1 ]]; then
+      currentVersion=$(echo "$currentVersion" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+    fi
 
     create_new_branch
 
