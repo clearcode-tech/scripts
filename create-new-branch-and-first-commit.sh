@@ -134,6 +134,9 @@ function set_sbt_project_version() {
     # Get version from sbt
     currentVersion=$(grep "version :=" build.sbt | cut -d '"' -f2)
     check_for_feature_branch "$currentVersion"
+    if [[ $? -eq 1 ]]; then
+      currentVersion=$(echo "$currentVersion" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+    fi
 
     create_new_branch
 
@@ -152,6 +155,9 @@ function set_angular_project_version() {
     # Get version from ui project
     currentVersion=$(grep "version: string =" src/environments/version.ts | cut -d '"' -f2)
     check_for_feature_branch "$currentVersion"
+    if [[ $? -eq 1 ]]; then
+      currentVersion=$(echo "$currentVersion" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+    fi
 
     create_new_branch
 
