@@ -32,6 +32,17 @@ readonly SBT_PROJECT="SBT"
 readonly ANGULAR_PROJECT="Angular"
 readonly UNRECOGNIZED_PROJECT="Unrecognized"
 
+# Cross-platform sed -i (macOS requires empty string argument, Linux does not)
+function sed_inplace() {
+    local expression="$1"
+    local file="$2"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i "" "$expression" "$file"
+    else
+        sed -i "$expression" "$file"
+    fi
+}
+
 main() {
 
   # Check whether user had supplied -h or --help. If yes display usage
@@ -72,7 +83,7 @@ main() {
   # call the project identification function and store result in variable
   projectType=$(identify_project_type)
 
-  echo "Project Type: ${!projectType}"
+  echo "Project Type: $projectType"
 
   case $projectType in
 
@@ -247,7 +258,7 @@ function set_sbt_project_version() {
     newVersion=$(getIncrementedVersion "$currentVersion")
 
     # Set sbt project version
-    sed -i "s/version := .*/version := \"$newVersion\"/" build.sbt
+    sed_inplace "s/version := .*/version := \"$newVersion\"/" build.sbt
 
     # Add changes to commit
     git add build.sbt
@@ -266,7 +277,7 @@ function set_angular_project_version() {
     newVersion=$(getIncrementedVersion "$currentVersion")
 
     # Set version to ui project
-    sed -i "s/version: string = .*/version: string = \"$newVersion\";/" src/environments/version.ts
+    sed_inplace "s/version: string = .*/version: string = \"$newVersion\";/" src/environments/version.ts
 
     # Add changes to commit
     git add src/environments/version.ts
