@@ -31,6 +31,17 @@ readonly SBT_PROJECT="SBT"
 readonly ANGULAR_PROJECT="Angular"
 readonly UNRECOGNIZED_PROJECT="Unrecognized"
 
+# Cross-platform sed -i (macOS requires empty string argument, Linux does not)
+function sed_inplace() {
+    local expression="$1"
+    local file="$2"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i "" "$expression" "$file"
+    else
+        sed -i "$expression" "$file"
+    fi
+}
+
 # Arguments check
 function validate_args() {
 
@@ -141,7 +152,7 @@ function set_sbt_project_version() {
     create_new_branch
 
     # Set sbt project version
-    sed -i "s/version := .*/version := \"$currentVersion.$branchName\"/" build.sbt
+    sed_inplace "s/version := .*/version := \"$currentVersion.$branchName\"/" build.sbt
 
     # Add changes to commit
     git add build.sbt
@@ -162,7 +173,7 @@ function set_angular_project_version() {
     create_new_branch
 
     # Set version to ui project
-    sed -i "s/version: string = .*/version: string = \"$currentVersion.$branchName\";/" src/environments/version.ts
+    sed_inplace "s/version: string = .*/version: string = \"$currentVersion.$branchName\";/" src/environments/version.ts
 
     # Add changes to commit
     git add src/environments/version.ts
@@ -251,7 +262,7 @@ check_branch_is_up_to_date
 # call the project identification function and store result in variable
 projectType=$(identify_project_type)
 
-echo "Project Type: ${!projectType}"
+echo "Project Type: $projectType"
 
 case $projectType in
 
