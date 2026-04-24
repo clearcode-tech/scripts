@@ -22,6 +22,8 @@
 # Параметры:
 #  - branchName - Имя ветки, которая будет создана
 #  - taskName - Название задачи, которое будет добавлено в первый комментарий
+#  - pull_request_target_branch (опционально) - Ветка, в которую будет создан пулл-реквест.
+#               Если не задан, скрипт автоматически находит максимальную ветку release/ и использует её.
 #  - key:  - Ключ запуска скрипта:
 #               -hf | --hotfix если задача выпускается как хотфикс и нужен дополнительный пулл-реквест в мастер-ветку
 
@@ -70,6 +72,20 @@ function check_branch_for_uncommitted_or_local_commits() {
       echo "Error: You have local commits. New branch cannot be created."
       exit 1
     fi
+}
+
+# Find the maximum release/ branch from remote
+function find_max_release_branch() {
+
+    local maxBranch
+    maxBranch=$(git branch -r | grep 'origin/release/' | sed 's|.*origin/||' | sort -V | tail -1)
+
+    if [ -z "$maxBranch" ]; then
+        echo "Error: No release/ branches found in remote." >&2
+        exit 1
+    fi
+
+    echo "$maxBranch"
 }
 
 # Check branch is up to date
@@ -221,7 +237,8 @@ function display_usage() {
   echo "Скрипт создания задачной ветки и начального коммита для проектов: maven, sbt, angular."
   echo "Скрипт должен быть запущен из директории проекта, для которого создаётся ветка,"
   echo "и проект должен быть не на задачной ветке, а на ветке dev или master."
-  echo -e "\nИспользование: $0 [имя_создаваемой_ветки] [название_задачи_без_точки_в_кавычках] [ветка_релиза] \n"
+  echo -e "\nИспользование: $0 [имя_создаваемой_ветки] [название_задачи_без_точки_в_кавычках] [ветка_релиза (опционально)] \n"
+  echo "Если ветка_релиза не указана, скрипт автоматически найдёт максимальную ветку release/ и использует её."
 }
 
 # Check whether user had supplied -h or --help. If yes display usage
@@ -232,7 +249,7 @@ then
 fi
 
 # If less than two arguments supplied, display usage
-if [  $# -le 2 ]
+if [  $# -le 1 ]
 then
   display_usage
   exit 1
@@ -247,12 +264,21 @@ validate_args
 
 echo "Branch name: $branchName"
 echo "Task name: $taskName"
-echo "Pull request target branch: $pull_request_target_branch"
 
 # Fetch all branches
 git fetch --all
 
 check_branch_for_uncommitted_or_local_commits
+
+# If pull_request_target_branch is not set, auto-detect the maximum release/ branch and switch to it
+if [ -z "$pull_request_target_branch" ]; then
+    echo "Ветка релиза не указана. Поиск максимальной ветки release/..."
+    pull_request_target_branch=$(find_max_release_branch)
+    echo "Найдена ветка релиза: $pull_request_target_branch"
+    git checkout "$pull_request_target_branch"
+fi
+
+echo "Pull request target branch: $pull_request_target_branch"
 
 # Pull changes
 git pull
