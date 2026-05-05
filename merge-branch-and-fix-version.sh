@@ -9,6 +9,7 @@
 # Скрипт выполняет следующие действия:
 #  - переключается на ветку dev
 #  - проверяет обновления в удалённой ветке и обновляет локальную ветку
+#  - проверяет пулл-реквест в GitLab: целевую ветку, наличие, предлагает исправить или создать
 #  - сливает задачную ветку в dev
 #  - просит разрешить конфликты, если они есть.
 #  - определяет тип проекта
@@ -17,14 +18,18 @@
 #  - инкрементирует версию и делает фиксирующий коммит с новой версией
 #  - добавляет тег с новой версией
 #  - пушит изменения в удалённый репозиторий после подтверждения пользователем операции
-
+#
+# Зависимости:
+#  - glab  (GitLab CLI): brew install glab && glab auth login
+#  - jq    (JSON-парсер): brew install jq
 #
 # Валидации:
 #  - Проверяет, что текущая ветка не содержит незакоммиченных изменений и ветка актуальна (состояние совпадает с
 #    удалённой веткой)
 #
 # Параметры:
-#  - branchName - Имя ветки, которая будет слита в dev
+#  - releaseBranchName - Имя релизной ветки, в которую будет произведено слитие
+#  - branchName        - Имя ветки, которая будет слита
 
 # Constants for project types
 readonly MAVEN_PROJECT="Maven"
@@ -62,6 +67,19 @@ main() {
   releaseBranchName=$1
   branchName=$2
 
+  # Check required dependencies
+  if ! command -v glab &> /dev/null; then
+    echo "Error: glab (GitLab CLI) не установлен."
+    echo "Установи: brew install glab && glab auth login"
+    exit 1
+  fi
+
+  if ! command -v jq &> /dev/null; then
+    echo "Error: jq не установлен."
+    echo "Установи: brew install jq"
+    exit 1
+  fi
+
   validate_args
   echo "Имя релизной ветки: $releaseBranchName"
   echo "Имя ветки для слития: $branchName"
@@ -77,6 +95,8 @@ main() {
   git checkout "$releaseBranchName"
   # Pull changes
   git pull
+
+  check_and_fix_pull_request
 
   merge_branch
 
@@ -284,6 +304,85 @@ function set_angular_project_version() {
 
     #echo "Setting version for Angular project"
     echo "$newVersion"
+}
+
+# Check pull request in GitLab before merging.
+# Scenarios:
+#   1. No open MRs for the branch          → offer to create one
+#   2. MR targeting the correct branch     → continue
+#   3. Exactly 1 MR with a wrong target    → offer to fix automatically
+#   4. Multiple MRs all with wrong targets → show links, ask user to fix manually
+function check_and_fix_pull_request() {
+
+  echo ""
+  echo "Проверка пулл-реквеста в GitLab для ветки '$branchName'..."
+
+  local mr_json
+  mr_json=$(glab mr list --source-branch "$branchName" --output json 2>/dev/null)
+
+  if [ $? -ne 0 ] || [ -z "$mr_json" ] || [ "$mr_json" = "null" ] || [ "$mr_json" = "[]" ]; then
+    mr_json="[]"
+  fi
+
+  local mr_count
+  mr_count=$(echo "$mr_json" | jq 'length')
+
+  # Сценарий 1: MR не существует
+  if [ "$mr_count" -eq 0 ]; then
+    echo "Открытых пулл-реквестов для ветки '$branchName' не найдено."
+    read -r -p "Создать MR в ветку '$releaseBranchName'? [y/N] " answer
+    if [[ "$answer" =~ ^[Yy]$ ]]; then
+      echo "Создание MR: '$branchName' → '$releaseBranchName'..."
+      glab mr create \
+        --source-branch "$branchName" \
+        --target-branch "$releaseBranchName" \
+        --title "$branchName" \
+        --yes
+    fi
+    echo ""
+    return
+  fi
+
+  # Проверяем есть ли MR с нужной целевой веткой
+  local correct_count
+  correct_count=$(echo "$mr_json" | jq --arg target "$releaseBranchName" '[.[] | select(.target_branch == $target)] | length')
+
+  # Сценарий 2: уже есть MR с правильной целевой веткой
+  if [ "$correct_count" -gt 0 ]; then
+    local correct_url
+    correct_url=$(echo "$mr_json" | jq -r --arg target "$releaseBranchName" '.[] | select(.target_branch == $target) | .web_url' | head -1)
+    echo "✓ Пулл-реквест уже направлен в нужную ветку '$releaseBranchName'."
+    echo "  Ссылка: $correct_url"
+    echo ""
+    return
+  fi
+
+  # Все MR направлены в другие ветки
+  # Сценарий 3: ровно 1 MR с неправильной целевой веткой
+  if [ "$mr_count" -eq 1 ]; then
+    local mr_iid mr_target mr_url
+    mr_iid=$(echo "$mr_json"  | jq -r '.[0].iid')
+    mr_target=$(echo "$mr_json" | jq -r '.[0].target_branch')
+    mr_url=$(echo "$mr_json"  | jq -r '.[0].web_url')
+
+    echo "Пулл-реквест направлен в ветку '$mr_target', а не в '$releaseBranchName'."
+    echo "  Ссылка: $mr_url"
+    read -r -p "Изменить целевую ветку на '$releaseBranchName' автоматически? [y/N] " answer
+    if [[ "$answer" =~ ^[Yy]$ ]]; then
+      echo "Изменение целевой ветки MR !$mr_iid → '$releaseBranchName'..."
+      glab mr update "$mr_iid" --target-branch "$releaseBranchName"
+      echo "✓ Целевая ветка обновлена."
+    fi
+    echo ""
+    return
+  fi
+
+  # Сценарий 4: несколько MR, все с неправильными целевыми ветками
+  echo "Найдено несколько открытых пулл-реквестов для ветки '$branchName', ни один не направлен в '$releaseBranchName':"
+  echo "$mr_json" | jq -r '.[] | "  MR !\(.iid)  →  \(.target_branch)  \(.web_url)"'
+  echo ""
+  read -n 1 -s -r -p "Исправь целевые ветки MR вручную и нажми любую клавишу для продолжения. Для отмены нажми Ctrl+C"
+  echo ""
 }
 
 main "$@";
