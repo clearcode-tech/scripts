@@ -209,6 +209,18 @@ function validate_args() {
       echo "Error: No branch name specified."
       exit 1
     fi
+
+    # Check that release branch exists in remote repository
+    if ! git rev-parse --verify "origin/$releaseBranchName" &>/dev/null; then
+      echo "Error: Ветка '$releaseBranchName' не найдена в удалённом репозитории."
+      exit 1
+    fi
+
+    # Check that source branch exists in remote repository
+    if ! git rev-parse --verify "origin/$branchName" &>/dev/null; then
+      echo "Error: Ветка '$branchName' не найдена в удалённом репозитории."
+      exit 1
+    fi
 }
 
 # Check branch for uncommitted changes or local commits
