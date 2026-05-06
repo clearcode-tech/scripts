@@ -118,19 +118,49 @@ function find_max_release_branch() {
     echo "$maxBranch"
 }
 
-# Extract MAJOR version from a branch name.
-# Expects branch name like "release/1.4" or "v2_release/2.3".
-# Returns the part before the dot in the version segment.
-function extract_major_from_branch() {
+# Read the current application version depending on project type.
+# Returns clean MAJOR.MINOR.PATCH trimmed of any snapshot/branch suffixes.
+function read_current_version() {
 
-    local branch="$1"
-    # Get the part after the last "/"
-    local versionPart="${branch##*/}"
-    # Get the part before the first "."
-    local major="${versionPart%%.*}"
+    local projectType="$1"
+
+    local rawVersion
+    case $projectType in
+        MAVEN_PROJECT)
+            rawVersion=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | grep -v '\[')
+            ;;
+        SBT_PROJECT)
+            rawVersion=$(grep "version :=" build.sbt | cut -d '"' -f2)
+            ;;
+        ANGULAR_PROJECT)
+            rawVersion=$(grep "version: string =" src/environments/version.ts | cut -d '"' -f2)
+            ;;
+        *)
+            echo "Error: Неподдерживаемый тип проекта — невозможно прочитать версию." >&2
+            exit 1
+            ;;
+    esac
+
+    # Strip any suffix after the third numeric segment (e.g. -SNAPSHOT, .HRL-123)
+    local cleanVersion
+    cleanVersion=$(echo "$rawVersion" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+
+    if [ -z "$cleanVersion" ]; then
+        echo "Error: Не удалось прочитать версию проекта." >&2
+        exit 1
+    fi
+
+    echo "$cleanVersion"
+}
+
+# Extract MAJOR from a version string like "1.4.7"
+function extract_major_from_version() {
+
+    local version="$1"
+    local major="${version%%.*}"
 
     if [ -z "$major" ] || ! [[ "$major" =~ ^[0-9]+$ ]]; then
-        echo "Error: Не удалось извлечь MAJOR-версию из ветки '$branch'. Ожидается формат: prefix/MAJOR.MINOR" >&2
+        echo "Error: Не удалось извлечь MAJOR из версии '$version'." >&2
         exit 1
     fi
 
@@ -242,16 +272,30 @@ main() {
 
     check_branch_for_uncommitted_or_local_commits
 
-    # Find max release branch and derive MAJOR
+    # Find max release branch
     echo "Поиск максимальной ветки, содержащей слово 'release'..."
     baseReleaseBranch=$(find_max_release_branch)
     echo "Найдена базовая ветка: $baseReleaseBranch"
 
-    releaseMajor=$(extract_major_from_branch "$baseReleaseBranch")
+    # Switch to base release branch and update
+    git checkout "$baseReleaseBranch"
+    git pull
+
+    check_branch_is_up_to_date
+
+    # Identify project type
+    projectType=$(identify_project_type)
+    echo "Тип проекта: $projectType"
+
+    # Read MAJOR from the actual project version
+    currentVersion=$(read_current_version "$projectType")
+    echo "Текущая версия проекта: $currentVersion"
+
+    releaseMajor=$(extract_major_from_version "$currentVersion")
     echo "MAJOR-версия: $releaseMajor"
 
     # Build new branch name and version
-    newBranchName="${releaseBranchPrefix}/${releaseMajor}.${releaseMinor}"
+    newBranchName="${releaseBranchPrefix}/${releaseMinor}"
     newVersion="${releaseMajor}.${releaseMinor}.0"
 
     echo "Имя новой ветки : $newBranchName"
@@ -263,19 +307,10 @@ main() {
         exit 1
     fi
 
-    # Switch to base release branch and update
-    git checkout "$baseReleaseBranch"
-    git pull
-
-    check_branch_is_up_to_date
-
     # Create new release branch
     git checkout -b "$newBranchName"
     echo "Создана ветка '$newBranchName'"
 
-    # Identify project type and set version
-    projectType=$(identify_project_type)
-    echo "Тип проекта: $projectType"
 
     case $projectType in
 
