@@ -276,9 +276,13 @@ function set_maven_project_version() {
         # Increment version
         newVersion=$(getIncrementedVersion "$currentVersion")
 
-        # Update only the <revision> property inside <properties>
-        # The pattern matches the first occurrence to avoid touching other possible <revision> usages
-        sed_inplace "0,/<revision>.*<\/revision>/s|<revision>.*</revision>|<revision>$newVersion</revision>|" pom.xml
+        # Update only the first <revision> property (inside <properties>).
+        # awk is used instead of sed because BSD sed (macOS) does not support the 0,/pattern/ address.
+        local tmpfile
+        tmpfile=$(mktemp)
+        awk -v ver="$newVersion" \
+            '!replaced && /<revision>.*<\/revision>/ { sub(/<revision>.*<\/revision>/, "<revision>" ver "</revision>"); replaced=1 } { print }' \
+            pom.xml > "$tmpfile" && mv "$tmpfile" pom.xml
     else
         # Standard Maven layout — use the versions plugin
         currentVersion=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | grep -v '\[')
