@@ -259,22 +259,39 @@ function identify_project_type() {
 }
 
 # Set the project version for Maven project, create new branch and add changes to commit.
+# Supports two layouts:
+#   1. Standard: <version>1.2.3</version>  → updated via mvn versions:set
+#   2. Revision: <version>${revision}</version> with <revision>…</revision> in <properties>
+#      → only the <revision> property is updated via sed (mvn versions:set would overwrite ${revision})
 function set_maven_project_version() {
 
-    # Get current version
-    currentVersion=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | grep -v '\[')
+    # Detect whether the project uses the ${revision} CI-friendly layout
+    local uses_revision
+    uses_revision=$(grep -c '<version>\${revision}</version>' pom.xml || true)
 
-    # Increment version
-    newVersion=$(getIncrementedVersion "$currentVersion")
+    if [ "$uses_revision" -gt 0 ]; then
+        # Read current version from the <revision> property
+        currentVersion=$(grep -m1 '<revision>' pom.xml | sed 's/.*<revision>\(.*\)<\/revision>.*/\1/' | tr -d '[:space:]')
 
-    # Set new version
-    mvn versions:set -DnewVersion="$newVersion"
-    mvn versions:commit
+        # Increment version
+        newVersion=$(getIncrementedVersion "$currentVersion")
+
+        # Update only the <revision> property inside <properties>
+        # The pattern matches the first occurrence to avoid touching other possible <revision> usages
+        sed_inplace "0,/<revision>.*<\/revision>/s|<revision>.*</revision>|<revision>$newVersion</revision>|" pom.xml
+    else
+        # Standard Maven layout — use the versions plugin
+        currentVersion=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | grep -v '\[')
+
+        newVersion=$(getIncrementedVersion "$currentVersion")
+
+        mvn versions:set -DnewVersion="$newVersion"
+        mvn versions:commit
+    fi
 
     # Add changes to commit
     git add pom.xml
 
-    #echo "Setting version for Maven project"
     echo "$newVersion"
 }
 
