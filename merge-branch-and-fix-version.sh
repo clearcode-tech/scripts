@@ -349,21 +349,9 @@ function check_and_fix_pull_request() {
   echo "Проверка пулл-реквеста в GitLab для ветки '$branchName'..."
 
   local mr_json
-  mr_json=$(glab mr list --source-branch "$branchName" --state opened --all --output json 2>/dev/null)
-  local glab_exit=$?
+  mr_json=$(glab mr list --source-branch "$branchName" --output json 2>/dev/null)
 
-  # Normalize empty / error output to an empty JSON array
-  if [ "$glab_exit" -ne 0 ] || [ -z "$mr_json" ] || [ "$mr_json" = "null" ]; then
-    mr_json="[]"
-  fi
-
-  # glab sometimes returns a JSON object instead of an array — normalise to array
-  if echo "$mr_json" | jq -e 'type == "object"' &>/dev/null; then
-    mr_json=$(echo "$mr_json" | jq '[.]')
-  fi
-
-  # Final safety: if still not a valid non-empty array, treat as empty
-  if ! echo "$mr_json" | jq -e 'type == "array"' &>/dev/null; then
+  if [ $? -ne 0 ] || [ -z "$mr_json" ] || [ "$mr_json" = "null" ] || [ "$mr_json" = "[]" ]; then
     mr_json="[]"
   fi
 
