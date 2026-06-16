@@ -89,9 +89,6 @@ main() {
 
   check_branch_for_uncommitted_or_local_commits
 
-  git checkout "$branchName"
-  git pull
-
   git checkout "$releaseBranchName"
   # Pull changes
   git pull
@@ -132,7 +129,8 @@ main() {
 
 function merge_branch() {
 
-  git merge $branchName --no-ff --no-commit
+  git fetch origin "$branchName"
+  git merge "origin/$branchName" --no-ff --no-commit
 
   # Проверять на наличие конфликтов пока они не будут исправлены пользователем, ожидать исправления ожиданием ввода
   while git status | grep -q 'Unmerged paths'; do
