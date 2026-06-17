@@ -241,7 +241,7 @@ function commit_tag_and_push() {
     read -n 1 -s -r -p "Проверь корректность версии и ветки. Для пуша нажми любую клавишу. Для отмены нажми Ctrl+C"
     echo ""
 
-    git push origin "$newBranchName"
+    git push --set-upstream origin "$newBranchName"
     git push --tags
 
     echo ""

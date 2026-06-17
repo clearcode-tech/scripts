@@ -167,8 +167,9 @@ function make_fix_version_commit() {
     # Ask press any key to push changes to remote repository
     read -n 1 -s -r -p "Нажми любую клавишу для пуша изменений в удалённый репозиторий. Для отмены нажми Ctrl+C"
 
-    # Push changes to remote repository with tags
-    git push
+    # Push changes to remote repository with tags.
+    # --set-upstream безопасно инициализирует tracking, если его ещё нет.
+    git push --set-upstream origin "$releaseBranchName"
     git push --tags
 
     echo "Making fix version commit"
