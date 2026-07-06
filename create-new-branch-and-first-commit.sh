@@ -270,17 +270,17 @@ git fetch --all
 
 check_branch_for_uncommitted_or_local_commits
 
-# If pull_request_target_branch is not set, auto-detect the maximum release/ branch and switch to it
+# If pull_request_target_branch is not set, auto-detect the maximum release/ branch
 if [ -z "$pull_request_target_branch" ]; then
     echo "Ветка релиза не указана. Поиск максимальной ветки release/..."
     pull_request_target_branch=$(find_max_release_branch)
     echo "Найдена ветка релиза: $pull_request_target_branch"
-    git checkout "$pull_request_target_branch"
 fi
 
 echo "Pull request target branch: $pull_request_target_branch"
 
-# Pull changes
+# Switch to release branch and pull changes
+git checkout "$pull_request_target_branch"
 git pull
 
 check_branch_is_up_to_date
